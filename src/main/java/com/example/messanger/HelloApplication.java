@@ -15,7 +15,7 @@ public class HelloApplication extends Application {
         FXMLLoader fxmlLoader = new FXMLLoader(HelloApplication.class.getResource("messanger.fxml"));
         Scene scene = new Scene(fxmlLoader.load());
         scene.getStylesheets().add(getClass().getResource("styles.css").toExternalForm());
-        stage.setTitle("Hello!");
+        stage.setTitle("Chat Chat");
         stage.setScene(scene);
         stage.show();
         HelloController controller = fxmlLoader.getController();

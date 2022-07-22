@@ -6,22 +6,14 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 
 public class User {
-    private String username;
-    private ObjectOutputStream out;
+    public String username;
+    public ObjectOutputStream out;
+    public ObjectInputStream in;
 
-    public User(String username, ObjectOutputStream out) throws IOException {
+    public User(String username, ObjectOutputStream out, ObjectInputStream in) throws IOException {
         this.username = username;
-        System.out.println("user 1");
         this.out = out;
-        System.out.println("user 2");
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public ObjectOutputStream getOut() {
-        return out;
+        this.in = in;
     }
 }
 

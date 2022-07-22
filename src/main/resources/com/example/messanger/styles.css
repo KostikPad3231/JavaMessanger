@@ -1,4 +1,49 @@
+.container {
+    -fx-background-color: #3f3c3f;
+}
+.list-view .scroll-bar:horizontal .increment-arrow,
+.list-view .scroll-bar:horizontal .decrement-arrow,
+.list-view .scroll-bar:horizontal .increment-button,
+.list-view .scroll-bar:horizontal .decrement-button {
+    -fx-padding:0;
+}
+.circle{
+    -fx-padding: 10px 1 0;
+    -fx-min-width: 10px;
+    -fx-max-width: 10px;
+    -fx-min-height: 10px;
+    -fx-max-height: 10px;
+    -fx-background-color: rgba(255, 136, 0);
+    -fx-background-radius: 50%;
+}
 .message{
-    -fx-border-width: 100px;
-    -fx-background-color: blue;
+    -fx-font-size: 12pt;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-padding: 2px 10px;
+}
+.in_message{
+    -fx-background-color: rgba(38, 147, 255, 0.5);
+}
+.out_message{
+    -fx-background-color: rgba(255, 136, 0, 0.4);
+}
+.list-cell{
+    -fx-background-color: white;
+}
+.list-cell:filled{
+    -fx-font-weight: bold;
+    -fx-background-color: #e5e5e5;
+    -fx-alignment: center;
+}
+.list-cell:selected{
+    -fx-text-fill: #ffffff;
+    -fx-background-color: rgba(38, 147, 255, 0.66);
+}
+#send{
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: bold;
+    -fx-background-color: rgba(38, 147, 255, 0.66);
+    -fx-border-radius: 2px;
+    -fx-background-radius: 2px;
 }

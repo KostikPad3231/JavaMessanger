@@ -11,7 +11,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Scanner;
 
 public class Client {
     private final Socket socket;
@@ -19,6 +18,7 @@ public class Client {
     private String username;
     private ObjectOutputStream out;
     private ObjectInputStream in;
+    private ArrayList<String> usersList = new ArrayList<>();
     public Client(String ip, int port, HelloController controller){
         try {
             socket = new Socket(ip, port);
@@ -32,24 +32,28 @@ public class Client {
     public void launch(){
         Thread gettingMessages = new Thread(this::getMessage);
         gettingMessages.start();
-        System.out.println("launched");
     }
     private void getMessage(){
         try{
             while(true){
-                System.out.println(1);
                 Document document = (Document) in.readObject();
-                System.out.println(2);
                 NodeList message_elements = document.getElementsByTagName("message").item(0).getChildNodes();
                 Message message = new Message(message_elements.item(0).getTextContent(),
                         message_elements.item(1).getTextContent(),
                         message_elements.item(2).getTextContent(),
                         message_elements.item(3).getTextContent());
-                System.out.println(message.getType());
-                if(message.getType().equals("notify")){
+                if(message.type.equals("notify all")){
                     notifyMe();
                 }
-                System.out.println(message.getFrom() + ": " + message.getText());
+                else if(message.type.equals("notify connect")){
+                    notifyConnect(message.text);
+                }
+                else if(message.type.equals("notify delete")){
+                    notifyDelete(message.text);
+                }
+                else{
+                    controller.getMessage(message.from, message.text);
+                }
             }
         } catch (IOException | ClassNotFoundException e) {
             throw new RuntimeException(e);
@@ -57,15 +61,27 @@ public class Client {
     }
     private void notifyMe() {
         try {
-            ArrayList<String> usersList = (ArrayList<String>) in.readObject();
-            System.out.println("notified with: " + usersList.size());
-            for(String user: usersList){
-                System.out.println("User: " + user);
-            }
+            usersList = (ArrayList<String>) in.readObject();
             controller.updateUsersList(usersList);
         } catch (IOException | ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
+    }
+    private void notifyConnect(String name){
+        usersList.add(name);
+        controller.addUserToUsersList(name);
+    }
+    private void notifyDelete(String name){
+        int idx = 0;
+        for (String s : usersList) {
+            if (s.equals(username)) continue;
+            if (s.equals(name)) {
+                break;
+            }
+            idx++;
+        }
+        usersList.remove(name);
+        controller.deleteUserFromUsersList(idx, name);
     }
     public void sendMessage(String message_type, String text, String user_to_send){
         DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
@@ -103,7 +119,6 @@ public class Client {
         }
     }
     public boolean trySetUsername(String username) {
-        System.out.println(username);
         String response;
         try {
             out.writeObject(username);
@@ -112,7 +127,6 @@ public class Client {
         } catch (IOException | ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
-        System.out.println("got response");
         if(response.equals("ok")){
             this.username = username;
             return true;
@@ -121,7 +135,6 @@ public class Client {
             return false;
         }
     }
-
     public void close() {
         try {
             sendMessage("disconnect", "", "");

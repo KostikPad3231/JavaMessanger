@@ -11,44 +11,31 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Scanner;
-import java.util.concurrent.Semaphore;
 
 public class Server {
     private static ArrayList<User> clients = new ArrayList<>();
     private static ArrayList<String> users = new ArrayList<>();
     public static void main(String[] args) throws IOException {
         try(ServerSocket serverSocket = new ServerSocket(60000)){
-            Semaphore semaphore = new Semaphore(3);
+            System.out.println("Сервер запущен!");
             while(true) {
                 new Thread(() -> {
-                    try {
-                        semaphore.acquire();
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
                     try(Socket client = serverSocket.accept()) {
                         serve(client);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
-                    } finally {
-                        System.out.println("клиент отключился");
-                        semaphore.release();
                     }
                 }).start();
             }
         }
     }
-
     private static void updateUsersList() {
         users.clear();
         for(User user: clients){
-            users.add(user.getUsername());
+            users.add(user.username);
         }
     }
-
     private static void serve(Socket client) throws IOException{
         ObjectOutputStream out = new ObjectOutputStream(client.getOutputStream());
         ObjectInputStream in = new ObjectInputStream(client.getInputStream());
@@ -69,15 +56,12 @@ public class Server {
                 out.flush();
             }
         }
-        String username = t_name;
-        System.out.println(username + " подключился");
-        System.out.println(1);
-        User new_user = new User(username, out);
+        System.out.println(t_name + " подключился");
+        User new_user = new User(t_name, out, in);
         clients.add(new_user);
-        users.add(username);
-        System.out.println("Before notifying " + users.size());
-        notifyUsers();
-        System.out.println(3);
+        users.add(t_name);
+        notifyUsersConnectUser(t_name);
+        notifyUser(new_user);
 
         while(true){
             try {
@@ -87,20 +71,19 @@ public class Server {
                         message_elements.item(1).getTextContent(),
                         message_elements.item(2).getTextContent(),
                         message_elements.item(3).getTextContent());
-                if(message.getType().equals("disconnect")){
-                    clients.removeIf(user -> user.getUsername().equals(message.getFrom()));
+                if(message.type.equals("disconnect")){
+                    System.out.println(message.from + " отключился");
+                    clients.removeIf(user -> user.username.equals(message.from));
                     updateUsersList();
-                    notifyUsers();
-                    client.close();
+                    notifyUsersDelete(message.from);
                     break;
                 }
-                System.out.println("Получил сообщение от " + message.getFrom() + " с текстом: " + message.getText());
-                System.out.println("Отправляю " + message.getTo());
+                System.out.println("Получил сообщение от " + message.from + " с текстом: " + message.text);
+                System.out.println("Отправляю " + message.to);
                 ObjectOutputStream out_to;
                 for (User user: clients) {
-                    System.out.println(user.getUsername());
-                    if(user.getUsername().equals(message.getTo())){
-                        out_to = user.getOut();
+                    if(user.username.equals(message.to)){
+                        out_to = user.out;
                         out_to.writeObject(document);
                         out_to.flush();
                         break;
@@ -111,8 +94,7 @@ public class Server {
             }
         }
     }
-    private static void notifyUsers(){
-        System.out.println(4);
+    private static void notifyUser(User user){
         DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
         DocumentBuilder documentBuilder;
         try {
@@ -120,7 +102,6 @@ public class Server {
         } catch (ParserConfigurationException e) {
             throw new RuntimeException(e);
         }
-        System.out.println(5);
         Document document = documentBuilder.newDocument();
         Element message = document.createElement("message");
         Element from = document.createElement("from");
@@ -129,7 +110,7 @@ public class Server {
         Element data = document.createElement("data");
         Text text_from = document.createTextNode("Server");
         Text text_to = document.createTextNode("");
-        Text text_type = document.createTextNode("notify");
+        Text text_type = document.createTextNode("notify all");
         Text text_data = document.createTextNode("");
         document.appendChild(message);
         message.appendChild(from);
@@ -140,24 +121,89 @@ public class Server {
         type.appendChild(text_type);
         message.appendChild(data);
         data.appendChild(text_data);
-        System.out.println(6);
 
-        for(String name: users){
-            System.out.println(name);
+        try {
+            user.out.writeObject(document);
+            user.out.flush();
+            user.out.writeObject(users);
+            user.out.flush();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
+    }
+    private static void notifyUsersConnectUser(String name){
+        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder documentBuilder;
+        try {
+            documentBuilder = documentBuilderFactory.newDocumentBuilder();
+        } catch (ParserConfigurationException e) {
+            throw new RuntimeException(e);
+        }
+        Document document = documentBuilder.newDocument();
+        Element message = document.createElement("message");
+        Element from = document.createElement("from");
+        Element to = document.createElement("to");
+        Element type = document.createElement("type");
+        Element data = document.createElement("data");
+        Text text_from = document.createTextNode("Server");
+        Text text_to = document.createTextNode("");
+        Text text_type = document.createTextNode("notify connect");
+        Text text_data = document.createTextNode(name);
+        document.appendChild(message);
+        message.appendChild(from);
+        from.appendChild(text_from);
+        message.appendChild(to);
+        to.appendChild(text_to);
+        message.appendChild(type);
+        type.appendChild(text_type);
+        message.appendChild(data);
+        data.appendChild(text_data);
 
-        ObjectOutputStream user_out;
         for(User user: clients){
             try {
-                System.out.println(7);
-                user_out = user.getOut();
-                user_out.writeObject(document);
-                user_out.flush();
-                System.out.println(8);
-                System.out.println("Notify " + user.getUsername() + " with " + users.size());
-                user_out.writeObject(users);
-                user_out.flush();
-                System.out.println(9);
+                if(!user.username.equals(name)){
+                    user.out.writeObject(document);
+                    user.out.flush();
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+    private static void notifyUsersDelete(String name){
+        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder documentBuilder;
+        try {
+            documentBuilder = documentBuilderFactory.newDocumentBuilder();
+        } catch (ParserConfigurationException e) {
+            throw new RuntimeException(e);
+        }
+        Document document = documentBuilder.newDocument();
+        Element message = document.createElement("message");
+        Element from = document.createElement("from");
+        Element to = document.createElement("to");
+        Element type = document.createElement("type");
+        Element data = document.createElement("data");
+        Text text_from = document.createTextNode("Server");
+        Text text_to = document.createTextNode("");
+        Text text_type = document.createTextNode("notify delete");
+        Text text_data = document.createTextNode(name);
+        document.appendChild(message);
+        message.appendChild(from);
+        from.appendChild(text_from);
+        message.appendChild(to);
+        to.appendChild(text_to);
+        message.appendChild(type);
+        type.appendChild(text_type);
+        message.appendChild(data);
+        data.appendChild(text_data);
+
+        for(User user: clients){
+            try {
+                if(!user.username.equals(name)){
+                    user.out.writeObject(document);
+                    user.out.flush();
+                }
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -165,7 +211,7 @@ public class Server {
     }
     private static boolean checkUsername(String username){
         for(User user: clients){
-            if(user.getUsername().equals(username)){
+            if(user.username.equals(username)){
                 return false;
             }
         }
